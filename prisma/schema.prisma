@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model account {
+  id                Int     @id @default(autoincrement())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              user    @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Account_userId_fkey")
+
+  @@unique([provider, providerAccountId], map: "Account_provider_providerAccountId_key")
+  @@index([userId], map: "Account_userId_fkey")
+}
+
+model campaign_results {
+  id          Int       @id @default(autoincrement())
+  campaignId  Int
+  date        DateTime  @db.Date
+  impressions Int       @default(0)
+  clicks      Int       @default(0)
+  cost        Decimal   @default(0.00) @db.Decimal(12, 2)
+  cpc         Decimal?  @db.Decimal(12, 2)
+  cpm         Decimal?  @db.Decimal(12, 2)
+  ctr         Decimal?  @db.Decimal(6, 2)
+  campaigns   campaigns @relation(fields: [campaignId], references: [id], onDelete: Cascade, map: "CampaignResults_campaignId_fkey")
+
+  @@index([campaignId], map: "CampaignResults_campaignId_idx")
+}
+
+model campaigns {
+  id               Int                @id @default(autoincrement())
+  userId           Int
+  platform         campaigns_platform @default(facebook)
+  name             String             @db.VarChar(200)
+  status           campaigns_status   @default(running)
+  dailyBudget      Int?
+  createdAt        DateTime           @default(now())
+  campaign_results campaign_results[]
+  user             user               @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Campaigns_userId_fkey")
+  leads            leads[]
+
+  @@index([userId], map: "Campaigns_userId_idx")
+}
+
+model invoices {
+  id        Int             @id @default(autoincrement())
+  userId    Int
+  packageId Int?
+  amount    Int
+  status    invoices_status @default(unpaid)
+  dueDate   DateTime?       @db.Date
+  notes     String?         @db.VarChar(255)
+  createdAt DateTime        @default(now())
+  packages  packages?       @relation(fields: [packageId], references: [id], map: "Invoices_packageId_fkey")
+  user      user            @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Invoices_userId_fkey")
+  payments  payments[]
+
+  @@index([packageId], map: "Invoices_packageId_idx")
+  @@index([userId], map: "Invoices_userId_idx")
+}
+
+model leads {
+  id         Int          @id @default(autoincrement())
+  userId     Int
+  campaignId Int?
+  name       String?
+  phone      String?      @db.VarChar(64)
+  status     leads_status @default(new)
+  source     String?      @db.VarChar(100)
+  createdAt  DateTime     @default(now())
+  campaigns  campaigns?   @relation(fields: [campaignId], references: [id], map: "Leads_campaignId_fkey")
+  user       user         @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Leads_userId_fkey")
+
+  @@index([campaignId], map: "Leads_campaignId_idx")
+  @@index([userId], map: "Leads_userId_idx")
+}
+
+model package_history {
+  id            Int                    @id @default(autoincrement())
+  userPackageId Int
+  action        package_history_action
+  note          String?                @db.VarChar(255)
+  date          DateTime               @default(now())
+  user_packages user_packages          @relation(fields: [userPackageId], references: [id], onDelete: Cascade, map: "PackageHistory_userPackageId_fkey")
+
+  @@index([userPackageId], map: "PackageHistory_userPackageId_idx")
+}
+
+model packages {
+  id            Int             @id @default(autoincrement())
+  name          String          @db.VarChar(150)
+  description   String?         @db.Text
+  price         Int             @default(0)
+  duration_days Int             @default(30)
+  createdAt     DateTime        @default(now())
+  invoices      invoices[]
+  user_packages user_packages[]
+}
+
+model payments {
+  id        Int      @id @default(autoincrement())
+  invoiceId Int
+  amount    Int
+  method    String?  @db.VarChar(100)
+  paidAt    DateTime @default(now())
+  invoices  invoices @relation(fields: [invoiceId], references: [id], onDelete: Cascade, map: "Payments_invoiceId_fkey")
+
+  @@index([invoiceId], map: "Payments_invoiceId_idx")
+}
+
+model reports_custom {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String   @db.VarChar(200)
+  content   String?  @db.LongText
+  createdAt DateTime @default(now())
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "ReportsCustom_userId_fkey")
+
+  @@index([userId], map: "ReportsCustom_userId_idx")
+}
+
+model reports_monthly {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  month     Int
+  year      Int
+  summary   String?  @db.Text
+  createdAt DateTime @default(now())
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "ReportsMonthly_userId_fkey")
+
+  @@index([userId], map: "ReportsMonthly_userId_idx")
+}
+
+model session {
+  id           Int      @id @default(autoincrement())
+  sessionToken String   @unique(map: "Session_sessionToken_key")
+  userId       Int
+  expires      DateTime
+  user         user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Session_userId_fkey")
+
+  @@index([userId], map: "Session_userId_fkey")
+}
+
+model ticket_messages {
+  id        Int                    @id @default(autoincrement())
+  ticketId  Int
+  sender    ticket_messages_sender
+  message   String                 @db.Text
+  createdAt DateTime               @default(now())
+  tickets   tickets                @relation(fields: [ticketId], references: [id], onDelete: Cascade, map: "TicketMessages_ticketId_fkey")
+
+  @@index([ticketId], map: "TicketMessages_ticketId_idx")
+}
+
+model tickets {
+  id              Int               @id @default(autoincrement())
+  userId          Int
+  subject         String            @db.VarChar(200)
+  status          tickets_status    @default(open)
+  createdAt       DateTime          @default(now())
+  ticket_messages ticket_messages[]
+  user            user              @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Tickets_userId_fkey")
+
+  @@index([userId], map: "Tickets_userId_idx")
+}
+
+model user {
+  id              Int               @id @default(autoincrement())
+  name            String?
+  email           String?           @unique(map: "User_email_key")
+  password        String?
+  whatsapp        String?
+  image           String?
+  emailVerified   DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  account         account[]
+  campaigns       campaigns[]
+  invoices        invoices[]
+  leads           leads[]
+  reports_custom  reports_custom[]
+  reports_monthly reports_monthly[]
+  session         session[]
+  tickets         tickets[]
+  user_packages   user_packages[]
+}
+
+model user_packages {
+  id              Int                  @id @default(autoincrement())
+  userId          Int
+  packageId       Int
+  status          user_packages_status @default(pending)
+  startDate       DateTime?
+  endDate         DateTime?
+  createdAt       DateTime             @default(now())
+  package_history package_history[]
+  packages        packages             @relation(fields: [packageId], references: [id], map: "UserPackages_packageId_fkey")
+  user            user                 @relation(fields: [userId], references: [id], onDelete: Cascade, map: "UserPackages_userId_fkey")
+
+  @@index([packageId], map: "UserPackages_packageId_idx")
+  @@index([userId], map: "UserPackages_userId_idx")
+}
+
+model verificationtoken {
+  identifier String
+  token      String   @unique(map: "VerificationToken_token_key")
+  expires    DateTime
+
+  @@unique([identifier, token], map: "VerificationToken_identifier_token_key")
+}
+
+enum campaigns_platform {
+  facebook
+  google
+  tiktok
+  other
+}
+
+enum package_history_action {
+  activated
+  renewed
+  expired
+  upgraded
+}
+
+enum ticket_messages_sender {
+  client
+  admin
+}
+
+enum tickets_status {
+  open
+  in_progress
+  closed
+}
+
+enum user_packages_status {
+  active
+  expired
+  pending
+}
+
+enum campaigns_status {
+  running
+  paused
+  finished
+}
+
+enum invoices_status {
+  unpaid
+  paid
+  overdue
+}
+
+enum leads_status {
+  new
+  contacted
+  qualified
+  unqualified
+  customer
+}
